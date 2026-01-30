@@ -132,6 +132,8 @@
             font-weight: 600;
             margin-top: 15px;
             transition: opacity 0.3s;
+            border: none;
+            cursor: pointer;
         }
         
         .link-button:hover {
@@ -217,6 +219,115 @@
             color: #a0a0a0;
             margin-top: 5px;
         }
+        
+        /* Commits & Issues Styles */
+        .dynamic-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .dynamic-item {
+            padding: 15px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border-left: 3px solid #e94560;
+            transition: background 0.3s;
+        }
+        
+        .dynamic-item:hover {
+            background: rgba(255,255,255,0.08);
+        }
+        
+        .dynamic-item a {
+            color: #fff;
+            text-decoration: none;
+            font-weight: 500;
+            display: block;
+            margin-bottom: 8px;
+        }
+        
+        .dynamic-item a:hover {
+            color: #e94560;
+        }
+        
+        .dynamic-meta {
+            font-size: 0.85em;
+            color: #888;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .dynamic-meta span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+        
+        .loading::after {
+            content: "";
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e94560;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .error {
+            text-align: center;
+            padding: 20px;
+            color: #ff6b6b;
+        }
+        
+        .label-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            margin-left: 8px;
+        }
+        
+        .label-bug {
+            background: rgba(215, 58, 74, 0.3);
+            color: #ff6b6b;
+        }
+        
+        .label-feature {
+            background: rgba(46, 213, 115, 0.3);
+            color: #2ed573;
+        }
+        
+        .refresh-btn {
+            float: right;
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #888;
+            padding: 5px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.3s;
+        }
+        
+        .refresh-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -243,6 +354,30 @@
         </div>
         
         <div class="grid">
+            <!-- 最近提交 -->
+            <div class="card">
+                <h2>
+                    <span class="icon">📝</span>
+                    最近提交
+                    <button class="refresh-btn" onclick="loadCommits()">↻ 刷新</button>
+                </h2>
+                <div id="commits-list" class="dynamic-list">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+            
+            <!-- 热门 Issue -->
+            <div class="card">
+                <h2>
+                    <span class="icon">🔥</span>
+                    热门讨论
+                    <button class="refresh-btn" onclick="loadIssues()">↻ 刷新</button>
+                </h2>
+                <div id="issues-list" class="dynamic-list">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+            
             <div class="card">
                 <h2><span class="icon">📊</span> 项目信息</h2>
                 <div class="info-item">
@@ -348,6 +483,7 @@
     </div>
     
     <script>
+        // 显示更新时间
         document.getElementById('updateTime').textContent = new Date().toLocaleString('zh-CN', {
             year: 'numeric',
             month: '2-digit',
@@ -356,6 +492,131 @@
             minute: '2-digit',
             second: '2-digit'
         });
+        
+        // 格式化时间
+        function formatTime(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = (now - date) / 1000; // 秒
+            
+            if (diff < 60) return '刚刚';
+            if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
+            if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
+            if (diff < 604800) return Math.floor(diff / 86400) + '天前';
+            return date.toLocaleDateString('zh-CN');
+        }
+        
+        // 截断文本
+        function truncate(str, maxLen) {
+            if (str.length <= maxLen) return str;
+            return str.substring(0, maxLen) + '...';
+        }
+        
+        // 获取 label 样式
+        function getLabelClass(name) {
+            if (name.includes('bug')) return 'label-bug';
+            if (name.includes('feature')) return 'label-feature';
+            return '';
+        }
+        
+        // 加载 Commits
+        async function loadCommits() {
+            const container = document.getElementById('commits-list');
+            container.innerHTML = '<div class="loading">加载中...</div>';
+            
+            try {
+                const response = await fetch('https://api.github.com/repos/moltbot/moltbot/commits?per_page=5');
+                if (!response.ok) throw new Error('获取失败');
+                
+                const commits = await response.json();
+                container.innerHTML = '';
+                
+                commits.forEach(commit => {
+                    const item = document.createElement('div');
+                    item.className = 'dynamic-item';
+                    item.innerHTML = `
+                        <a href="${commit.html_url}" target="_blank" title="${commit.commit.message}">
+                            ${truncate(commit.commit.message.split('\n')[0], 60)}
+                        </a>
+                        <div class="dynamic-meta">
+                            <span>👤 ${commit.author ? commit.author.login : commit.commit.author.name}</span>
+                            <span>🕐 ${formatTime(commit.commit.author.date)}</span>
+                            <span>🔗 ${commit.sha.substring(0, 7)}</span>
+                        </div>
+                    `;
+                    container.appendChild(item);
+                });
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="error">
+                        获取提交记录失败<br>
+                        <small>${error.message}</small><br>
+                        <a href="https://github.com/moltbot/moltbot/commits" target="_blank" style="color: #e94560;">查看 GitHub 提交记录 →</a>
+                    </div>
+                `;
+            }
+        }
+        
+        // 加载 Issues
+        async function loadIssues() {
+            const container = document.getElementById('issues-list');
+            container.innerHTML = '<div class="loading">加载中...</div>';
+            
+            try {
+                const response = await fetch('https://api.github.com/repos/moltbot/moltbot/issues?state=open&sort=comments&direction=desc&per_page=5');
+                if (!response.ok) throw new Error('获取失败');
+                
+                const issues = await response.json();
+                container.innerHTML = '';
+                
+                if (issues.length === 0) {
+                    container.innerHTML = '<div class="loading">暂无开放的 Issue</div>';
+                    return;
+                }
+                
+                issues.forEach(issue => {
+                    const item = document.createElement('div');
+                    item.className = 'dynamic-item';
+                    
+                    const labels = issue.labels.map(label => 
+                        `<span class="label-tag ${getLabelClass(label.name)}">${label.name}</span>`
+                    ).join('');
+                    
+                    item.innerHTML = `
+                        <a href="${issue.html_url}" target="_blank" title="${issue.title}">
+                            #${issue.number}: ${truncate(issue.title, 50)}
+                            ${labels}
+                        </a>
+                        <div class="dynamic-meta">
+                            <span>👤 ${issue.user.login}</span>
+                            <span>💬 ${issue.comments} 评论</span>
+                            <span>🕐 ${formatTime(issue.created_at)}</span>
+                        </div>
+                    `;
+                    container.appendChild(item);
+                });
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="error">
+                        获取 Issues 失败<br>
+                        <small>${error.message}</small><br>
+                        <a href="https://github.com/moltbot/moltbot/issues" target="_blank" style="color: #e94560;">查看 GitHub Issues →</a>
+                    </div>
+                `;
+            }
+        }
+        
+        // 页面加载时自动获取数据
+        window.addEventListener('load', () => {
+            loadCommits();
+            loadIssues();
+        });
+        
+        // 每 5 分钟自动刷新
+        setInterval(() => {
+            loadCommits();
+            loadIssues();
+        }, 300000);
     </script>
 </body>
 </html>

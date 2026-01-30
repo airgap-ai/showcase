@@ -220,7 +220,112 @@
             margin-top: 5px;
         }
         
-        /* Commits & Issues Styles */
+        /* Release Section Styles */
+        .release-card {
+            grid-column: span 2;
+        }
+        
+        @media (max-width: 768px) {
+            .release-card {
+                grid-column: span 1;
+            }
+        }
+        
+        .release-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .release-version {
+            font-size: 1.5em;
+            color: #e94560;
+            font-weight: 700;
+        }
+        
+        .release-date {
+            color: #888;
+            font-size: 0.9em;
+        }
+        
+        .release-content {
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .release-content h3 {
+            color: #e94560;
+            margin: 20px 0 10px;
+            font-size: 1.1em;
+        }
+        
+        .release-content h3:first-child {
+            margin-top: 0;
+        }
+        
+        .release-content ul {
+            margin-left: 20px;
+            color: #ccc;
+        }
+        
+        .release-content li {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+        
+        .release-content a {
+            color: #e94560;
+            text-decoration: none;
+        }
+        
+        .release-content a:hover {
+            text-decoration: underline;
+        }
+        
+        .release-content code {
+            background: rgba(255,255,255,0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+        
+        .error {
+            text-align: center;
+            padding: 20px;
+            color: #ff6b6b;
+        }
+        
+        .refresh-btn {
+            float: right;
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #888;
+            padding: 5px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.3s;
+        }
+        
+        .refresh-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+        
+        /* Issues Styles */
         .dynamic-list {
             max-height: 400px;
             overflow-y: auto;
@@ -265,35 +370,6 @@
             gap: 5px;
         }
         
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #888;
-        }
-        
-        .loading::after {
-            content: "";
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid #e94560;
-            border-radius: 50%;
-            border-top-color: transparent;
-            animation: spin 1s linear infinite;
-            margin-left: 10px;
-            vertical-align: middle;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        .error {
-            text-align: center;
-            padding: 20px;
-            color: #ff6b6b;
-        }
-        
         .label-tag {
             display: inline-block;
             padding: 2px 8px;
@@ -310,23 +386,6 @@
         .label-feature {
             background: rgba(46, 213, 115, 0.3);
             color: #2ed573;
-        }
-        
-        .refresh-btn {
-            float: right;
-            background: transparent;
-            border: 1px solid rgba(255,255,255,0.2);
-            color: #888;
-            padding: 5px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.85em;
-            transition: all 0.3s;
-        }
-        
-        .refresh-btn:hover {
-            background: rgba(255,255,255,0.1);
-            color: #fff;
         }
     </style>
 </head>
@@ -354,14 +413,14 @@
         </div>
         
         <div class="grid">
-            <!-- 最近提交 -->
-            <div class="card">
+            <!-- 最新版本发布 -->
+            <div class="card release-card">
                 <h2>
-                    <span class="icon">📝</span>
-                    最近提交
-                    <button class="refresh-btn" onclick="loadCommits()">↻ 刷新</button>
+                    <span class="icon">🚀</span>
+                    最新版本发布
+                    <button class="refresh-btn" onclick="loadRelease()">↻ 刷新</button>
                 </h2>
-                <div id="commits-list" class="dynamic-list">
+                <div id="release-content">
                     <div class="loading">加载中...</div>
                 </div>
             </div>
@@ -497,7 +556,7 @@
         function formatTime(dateString) {
             const date = new Date(dateString);
             const now = new Date();
-            const diff = (now - date) / 1000; // 秒
+            const diff = (now - date) / 1000;
             
             if (diff < 60) return '刚刚';
             if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
@@ -519,39 +578,64 @@
             return '';
         }
         
-        // 加载 Commits
-        async function loadCommits() {
-            const container = document.getElementById('commits-list');
+        // 将 markdown 简单转换为 HTML
+        function markdownToHtml(text) {
+            // 转换标题
+            text = text.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            text = text.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+            text = text.replace(/^# (.+)$/gm, '<h3>$1</h3>');
+            
+            // 转换列表
+            text = text.replace(/^- (.+)$/gm, '<li>$1</li>');
+            text = text.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+            
+            // 转换链接
+            text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+            
+            // 转换行内代码
+            text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            // 转换段落
+            text = text.replace(/\n\n/g, '<br><br>');
+            
+            return text;
+        }
+        
+        // 加载最新 Release
+        async function loadRelease() {
+            const container = document.getElementById('release-content');
             container.innerHTML = '<div class="loading">加载中...</div>';
             
             try {
-                const response = await fetch('https://api.github.com/repos/moltbot/moltbot/commits?per_page=5');
+                // 获取最新 release 列表
+                const response = await fetch('https://api.github.com/repos/moltbot/moltbot/releases/latest');
                 if (!response.ok) throw new Error('获取失败');
                 
-                const commits = await response.json();
-                container.innerHTML = '';
+                const release = await response.json();
                 
-                commits.forEach(commit => {
-                    const item = document.createElement('div');
-                    item.className = 'dynamic-item';
-                    item.innerHTML = `
-                        <a href="${commit.html_url}" target="_blank" title="${commit.commit.message}">
-                            ${truncate(commit.commit.message.split('\n')[0], 60)}
+                let html = `
+                    <div class="release-header">
+                        <span class="release-version">${release.tag_name}</span>
+                        <span class="release-date">${formatTime(release.published_at)}</span>
+                    </div>
+                    <div class="release-content">
+                        <h3>${release.name || release.tag_name}</h3>
+                        ${markdownToHtml(release.body || '暂无发布说明')}
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <a href="${release.html_url}" class="link-button" target="_blank">
+                            🔗 查看完整发布说明
                         </a>
-                        <div class="dynamic-meta">
-                            <span>👤 ${commit.author ? commit.author.login : commit.commit.author.name}</span>
-                            <span>🕐 ${formatTime(commit.commit.author.date)}</span>
-                            <span>🔗 ${commit.sha.substring(0, 7)}</span>
-                        </div>
-                    `;
-                    container.appendChild(item);
-                });
+                    </div>
+                `;
+                
+                container.innerHTML = html;
             } catch (error) {
                 container.innerHTML = `
                     <div class="error">
-                        获取提交记录失败<br>
+                        获取发布信息失败<br>
                         <small>${error.message}</small><br>
-                        <a href="https://github.com/moltbot/moltbot/commits" target="_blank" style="color: #e94560;">查看 GitHub 提交记录 →</a>
+                        <a href="https://github.com/moltbot/moltbot/releases" target="_blank" style="color: #e94560;">查看 GitHub Releases →</a>
                     </div>
                 `;
             }
@@ -608,15 +692,15 @@
         
         // 页面加载时自动获取数据
         window.addEventListener('load', () => {
-            loadCommits();
+            loadRelease();
             loadIssues();
         });
         
-        // 每 5 分钟自动刷新
+        // 每 10 分钟自动刷新
         setInterval(() => {
-            loadCommits();
+            loadRelease();
             loadIssues();
-        }, 300000);
+        }, 600000);
     </script>
 </body>
 </html>
